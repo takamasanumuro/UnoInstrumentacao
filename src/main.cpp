@@ -9,13 +9,19 @@ const byte analogPin=A0;
 char serialBuffer[64];
 unsigned long measureTime=0;
 unsigned long measureInterval=1000;
+uint16_t bitNumber=9;
+uint32_t digitalResolution=1023;
 uint8_t numSamples=64;
+uint32_t analogValue;
+uint32_t analogValueVoltage;
 void measure();
 void setup() {
   Serial.begin(115200);
   analogReference(INTERNAL);
   pinMode(analogPin,INPUT);
   measureState=MeasureMode::RAW;
+  digitalResolution=static_cast<uint32_t>(pow(2,bitNumber)-1);
+
 }
 
 void loop() {
@@ -28,7 +34,26 @@ void loop() {
         measureState=MeasureMode::OFF;
         Serial.println("OFF");
         break;
-
+      case 'd':
+        sprintf(serialBuffer,"Digital Resolution: %lu",digitalResolution);
+        Serial.println(serialBuffer);
+        break;
+      case 'b':
+        bitNumber==10? bitNumber=8: ++bitNumber;
+        digitalResolution=static_cast<uint32_t>(pow(2,bitNumber)); // CHECK WHY 1 IS BEING SUBTRACTED AUTOMATICALLY (seems to be sprintf)
+        Serial.print("Res: "); Serial.println(digitalResolution);
+        sprintf(serialBuffer,"BitNumber: %d\t Resolution: %lu",bitNumber,digitalResolution);
+        Serial.println(serialBuffer);
+        break;
+      /*case 'B':
+        Serial.print("Bit number 10: "); Serial.println(pow(2,10)-1);
+        Serial.print("Bit number 9: "); Serial.println(pow(2,9)-1);
+        Serial.print("Bit number 8: "); Serial.println(pow(2,8)-1);
+        Serial.print("Bit number 10: "); Serial.println(static_cast<uint32_t>(pow(2,10)-1));
+        Serial.print("Bit number 9: "); Serial.println(static_cast<uint32_t>(pow(2,9)-1));
+        Serial.print("Bit number 8: "); Serial.println(static_cast<uint32_t>(pow(2,8)-1));
+        break;
+      */
       case 'm':
         sprintf(serialBuffer,"MeasureMode: %d",static_cast<int>(measureState));
         Serial.println(serialBuffer);
@@ -61,7 +86,7 @@ void loop() {
           }
         }
         break;
-
+      
      
 /*
       case 'I':
@@ -91,19 +116,23 @@ void measure(){
     case MeasureMode::OFF:
       break;  
     case MeasureMode::RAW:
-      sprintf(serialBuffer,"RAW: ¨%i",analogRead(analogPin));
+      analogValue=analogRead(analogPin);
+      analogValueVoltage=analogValue*1100/1023;
+      sprintf(serialBuffer,"Raw: %lu, mV: %lu",analogValue,analogValueVoltage);
       Serial.println(serialBuffer);
       break;
     case MeasureMode::AVG:
       uint32_t sum=0;
-      uint32_t timer=micros();
+      //uint32_t timer=micros();
       for(int i=0;i<numSamples;i++){
         sum+=analogRead(analogPin);
-        sprintf(serialBuffer,"Average sum: %lu",sum);
-        Serial.println(serialBuffer);
+        //sprintf(serialBuffer,"Average sum: %lu",sum); // For debugging
+        //Serial.println(serialBuffer);
       }
-      timer-=micros()*1000;
-      sprintf(serialBuffer,"AVG: %lu",sum/numSamples);
+      analogValue=sum/numSamples;
+      analogValueVoltage=analogValue*1100/1023;
+      //timer-=micros()*1000;
+      sprintf(serialBuffer,"Average: %lu, mV: %lu",analogValue,analogValueVoltage);
       Serial.println(serialBuffer);
       break;
     
