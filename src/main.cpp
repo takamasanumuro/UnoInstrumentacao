@@ -2,9 +2,11 @@
 enum class MeasureMode{
   RAW,
   AVG,
+  EXCEL,
   OFF
 }measureState;
 
+typedef uint32_t excel;
 const byte analogPin=A0;
 char serialBuffer[64];
 unsigned long measureTime=0;
@@ -14,9 +16,14 @@ uint32_t digitalResolution=1023;
 uint8_t numSamples=64;
 uint32_t analogValue;
 uint32_t analogValueVoltage;
+uint32_t linha=0; // for EXCEL
+
+
 void measure();
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(19200);
+  Serial.println("CLEARDATA");
+  Serial.println("LABEL,Horario,Valor Codigo,Valor mV,Linha");
   analogReference(INTERNAL);
   pinMode(analogPin,INPUT);
   measureState=MeasureMode::RAW;
@@ -30,7 +37,7 @@ void loop() {
   while(Serial.available()){
     char inByte=Serial.read();
     switch(inByte){
-      case 'o':
+      case 'o'||'O':
         measureState=MeasureMode::OFF;
         Serial.println("OFF");
         break;
@@ -55,23 +62,30 @@ void loop() {
         break;
       */
       case 'm':
-        sprintf(serialBuffer,"MeasureMode: %d",static_cast<int>(measureState));
-        Serial.println(serialBuffer);
         measureState=MeasureMode::RAW;
+        sprintf(serialBuffer,"MeasureMode: RAW");
+        Serial.println(serialBuffer);
         break;
 
       case 'M':
-        sprintf(serialBuffer,"MeasureMode: %d",static_cast<int>(measureState));
-        Serial.println(serialBuffer);
         measureState=MeasureMode::AVG;
-        break;     
-
+        sprintf(serialBuffer,"MeasureMode: AVG");
+        Serial.println(serialBuffer);
+        break; 
+      case 'E':
+        measureState=MeasureMode::EXCEL;
+        sprintf(serialBuffer,"MeasureMode: EXCEL");
+        Serial.println(serialBuffer);
       case 's':
         sprintf(serialBuffer,"Samples: %d",numSamples);
         Serial.println(serialBuffer);
         break;
- 
-      case 'S':
+      case 'C':
+        sprintf(serialBuffer,"CLEARDATA");
+        Serial.println(serialBuffer);
+        break;
+      case 'S':{
+        
         uint16_t sum=0;
         Serial.println("debug S");
         for(int i=0; i<Serial.available(); i++){
@@ -86,10 +100,11 @@ void loop() {
           }
         }
         break;
+        }
       
      
-/*
-      case 'I':
+
+      case 'I':{
         uint16_t sum2=0;
         for(int i=0; i<Serial.available(); i++){
           char inByte=Serial.read();
@@ -103,7 +118,7 @@ void loop() {
           }
         }
         break;
-      */
+      }
     }
   }
 
@@ -121,7 +136,7 @@ void measure(){
       sprintf(serialBuffer,"Raw: %lu, mV: %lu",analogValue,analogValueVoltage);
       Serial.println(serialBuffer);
       break;
-    case MeasureMode::AVG:
+    case MeasureMode::AVG:{
       uint32_t sum=0;
       //uint32_t timer=micros();
       for(int i=0;i<numSamples;i++){
@@ -135,7 +150,29 @@ void measure(){
       sprintf(serialBuffer,"Average: %lu, mV: %lu",analogValue,analogValueVoltage);
       Serial.println(serialBuffer);
       break;
-    
+      }
+    case MeasureMode::EXCEL:
+      linha++;
+      uint32_t sum2=0;
+      //uint32_t timer=micros();
+      for(int i=0;i<numSamples;i++){
+        sum2+=analogRead(analogPin);
+        //sprintf(serialBuffer,"Average sum: %lu",sum); // For debugging
+        //Serial.println(serialBuffer);
+      }
+      analogValue=sum2/numSamples;
+      analogValueVoltage=analogValue*1100/1023;
+      Serial.print("analog value: "); Serial.println(analogValue);
+      Serial.print("analog value voltage: "); Serial.println(analogValueVoltage);
+      //timer-=micros()*1000;
+      sprintf(serialBuffer,"DATA,TIME,%lu,%lu,%lu",analogValue,analogValueVoltage,linha);
+      Serial.println(serialBuffer);
+
+      if(linha>200){
+        linha=0;
+        sprintf(serialBuffer,"ROW,SET,2");
+      }
+      break;
     }
   }
   
