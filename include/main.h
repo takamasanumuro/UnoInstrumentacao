@@ -16,7 +16,7 @@ Pin(uint8_t pin,const char* name): pin(pin),analogValue(0),analogValueVoltage(0)
 
 void Measure();
 void SerialCommands();
-
+void printPin(Pin& pin);
 
 
 
