@@ -1,11 +1,13 @@
 #include <Arduino.h>
 #include "main.h"
-enum class MeasureMode{
+
+enum class MeasureMode: uint8_t{
   RAW,
   AVG,
   EXCEL,
   OFF
 }measureState;
+
 
 typedef uint32_t excel;
 Pin strainPin=Pin(A0,"Strain");
@@ -20,7 +22,7 @@ uint16_t bitNumber=9;
 uint32_t digitalResolution=1023;
 uint8_t numSamples=64;
 uint16_t linha=0; // for EXCEL
-void arrayAddressPrint();
+
 
 void setup() {
   Serial.begin(19200);
@@ -34,8 +36,10 @@ void setup() {
 }
 
 void loop() {
-  Measure();
+  CheckExcelInput();
   SerialCommands();
+  Measure();
+  
 
 }
 
@@ -104,27 +108,35 @@ void Measure(){
     }
   }
   
-void arrayAddressPrint(){
-  bufferSerial[0]='\0';
-  for(auto& Pin:pins){
-    sprintf(bufferAux,"[%s]:%p ",Pin.name,&Pin);
-    strlcat(bufferSerial,bufferAux,bufferSize);
-  }
-  Serial.println(bufferSerial);
+void CheckExcelInput(){
+  static uint32_t excelCheckTimer=millis();
+  if(millis()-excelCheckTimer<4000) return;
+  excelCheckTimer=millis();
+  //Serial.println("CELL,GET,J1");
 }
 
 void SerialCommands(){
   while(Serial.available()){
     char inByte=Serial.read();
     switch(inByte){
+      case 'J':
+        delay(10);
+        inByte=Serial.read();
+        delay(10);
+        sprintf(bufferSerial,"Before: %c",inByte);
+        Serial.println(bufferSerial);
+        if(inByte <= '0' && inByte>='9') return;
+        sprintf(bufferSerial,"Excel: %d",inByte-'0');
+        Serial.println(bufferSerial);
+        measureState=static_cast<MeasureMode>(inByte-'0');
+        sprintf(bufferSerial,"MeasureMode: %d",static_cast<int>(measureState));
+        Serial.println(bufferSerial);
+
       case 'o':
         measureState=MeasureMode::OFF;
         Serial.println("OFF");
         break;
-      case 'a':
-        Serial.println("abc");
-        arrayAddressPrint();
-        break;
+      
       case 'd':
         sprintf(bufferSerial,"Digital Resolution: %lu",digitalResolution);
         Serial.println(bufferSerial);
@@ -136,15 +148,7 @@ void SerialCommands(){
         sprintf(bufferSerial,"BitNumber: %d\t Resolution: %lu",bitNumber,digitalResolution);
         Serial.println(bufferSerial);
         break;
-      /*case 'B':
-        Serial.print("Bit number 10: "); Serial.println(pow(2,10)-1);
-        Serial.print("Bit number 9: "); Serial.println(pow(2,9)-1);
-        Serial.print("Bit number 8: "); Serial.println(pow(2,8)-1);
-        Serial.print("Bit number 10: "); Serial.println(static_cast<uint32_t>(pow(2,10)-1));
-        Serial.print("Bit number 9: "); Serial.println(static_cast<uint32_t>(pow(2,9)-1));
-        Serial.print("Bit number 8: "); Serial.println(static_cast<uint32_t>(pow(2,8)-1));
-        break;
-      */
+  
       case 'm':
         measureState=MeasureMode::RAW;
         sprintf(bufferSerial,"MeasureMode: RAW");
