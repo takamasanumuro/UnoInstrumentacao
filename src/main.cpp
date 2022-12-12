@@ -11,7 +11,7 @@ enum class MeasureMode: uint8_t{
 
 typedef uint32_t excel;
 Pin strainPin=Pin(A0,"Strain");
-Pin currentPin=Pin(A1,"Current");
+Pin currentPin=Pin(A5,"Current");
 Pin pins[]={strainPin,currentPin};
 const uint8_t bufferSize=64;
 char bufferSerial[bufferSize];
@@ -39,8 +39,6 @@ void loop() {
   CheckExcelInput();
   SerialCommands();
   Measure();
-  
-
 }
 
 void Measure(){
@@ -49,64 +47,63 @@ void Measure(){
   if(millis()-measureTime<measureInterval) return;
     measureTime=millis();
     switch(measureState){
-    case MeasureMode::OFF:
-      break;  
-    case MeasureMode::RAW:
-      for(auto& Pin:pins){   
-        Pin.analogValue=analogRead(Pin.pin);
-        Pin.analogValueVoltage=Pin.analogValue*1100/1023;
-        sprintf(bufferAux,"[%s]--Raw: %lu, mV: %lu ",Pin.name,Pin.analogValue,Pin.analogValueVoltage);
-        strlcat(bufferSerial,bufferAux,bufferSize);
-      }
-      Serial.println(bufferSerial);
-      break;
-    case MeasureMode::AVG:
-      for(auto& Pin:pins){
-        for(uint8_t i=0;i<numSamples;i++){
-          sum+=analogRead(Pin.pin);
+      case MeasureMode::OFF:
+        break;  
+      case MeasureMode::RAW:
+        for(auto& Pin:pins){   
+          Pin.analogValue=analogRead(Pin.pin);
+          Pin.analogValueVoltage=Pin.analogValue*1100/1023;
+          sprintf(bufferAux,"[%s]--Raw: %lu, mV: %lu ",Pin.name,Pin.analogValue,Pin.analogValueVoltage);
+          strlcat(bufferSerial,bufferAux,bufferSize);
         }
-        Pin.analogValue=sum/numSamples; // to check division arithmetics
-        Pin.analogValueVoltage=Pin.analogValue*1100/1023;
-        sprintf(bufferAux,"[%s]Average: %lu, mV: %lu ",Pin.name,Pin.analogValue,Pin.analogValueVoltage);
-        strlcat(bufferSerial,bufferAux,bufferSize);
-        sum=0;
-      }
-      Serial.println(bufferSerial);
-      break;
-      
-    case MeasureMode::EXCEL:
-      linha++;
-      for(auto& Pin:pins){
-        for(uint8_t i=0;i<numSamples;i++){
-          sum+=analogRead(Pin.pin);
-        }
-        Pin.analogValue=sum/numSamples;
-        Pin.analogValueVoltage=Pin.analogValue*1100/1023;
-        sprintf(bufferAux,"[%s]:%lu,%lu ",Pin.name,Pin.analogValue,Pin.analogValueVoltage);
-        strlcat(bufferSerial,bufferAux,bufferSize);
-        sum=0;
-       }
-      sprintf(bufferAux,",%u\n",linha); // subtract memory addresses
-      strlcat(bufferSerial,bufferAux,bufferSize);
-      Serial.println(bufferSerial);
-      
-      sprintf(bufferSerial,"DATA,TIME");
-      for(auto& Pin:pins){
-        sprintf(bufferAux,",%lu,%lu",Pin.analogValue,Pin.analogValueVoltage);
-        strlcat(bufferSerial,bufferAux,bufferSize);
-      }
-      sprintf(bufferAux,",%u",linha);
-      strlcat(bufferSerial,bufferAux,bufferSize);
-      Serial.println(bufferSerial);
-
-      if(linha>200){
-        linha=0;
-        sprintf(bufferSerial,"ROW,SET,2");
         Serial.println(bufferSerial);
+        break;
+      case MeasureMode::AVG:
+        for(auto& Pin:pins){
+          for(uint8_t i=0;i<numSamples;i++){
+            sum+=analogRead(Pin.pin);
+          }
+          Pin.analogValue=sum/numSamples; // to check division arithmetics
+          Pin.analogValueVoltage=Pin.analogValue*1100/1023;
+          sprintf(bufferAux,"[%s]Average: %lu, mV: %lu ",Pin.name,Pin.analogValue,Pin.analogValueVoltage);
+          strlcat(bufferSerial,bufferAux,bufferSize);
+          sum=0;
+        }
+        Serial.println(bufferSerial);
+        break;
+        
+      case MeasureMode::EXCEL:
+        linha++;
+        for(auto& Pin:pins){
+          for(uint8_t i=0;i<numSamples;i++){
+            sum+=analogRead(Pin.pin);
+          }
+          Pin.analogValue=sum/numSamples;
+          Pin.analogValueVoltage=Pin.analogValue*1100/1023;
+          sprintf(bufferAux,"[%s]:%lu,%lu ",Pin.name,Pin.analogValue,Pin.analogValueVoltage);
+          strlcat(bufferSerial,bufferAux,bufferSize);
+          sum=0;
+        }
+        sprintf(bufferAux,",%u\n",linha); // subtract memory addresses
+        strlcat(bufferSerial,bufferAux,bufferSize);
+        Serial.println(bufferSerial);
+        
+        sprintf(bufferSerial,"DATA,TIME");
+        for(auto& Pin:pins){
+          sprintf(bufferAux,",%lu,%lu",Pin.analogValue,Pin.analogValueVoltage);
+          strlcat(bufferSerial,bufferAux,bufferSize);
+        }
+        sprintf(bufferAux,",%u",linha);
+        strlcat(bufferSerial,bufferAux,bufferSize);
+        Serial.println(bufferSerial);
+        break;
       }
-      break;
+    if(linha>200){
+      linha=0;
+      sprintf(bufferSerial,"ROW,SET,2");
+      Serial.println(bufferSerial);
     }
-  }
+}
   
 void CheckExcelInput(){
   static uint32_t excelCheckTimer=millis();
@@ -116,21 +113,23 @@ void CheckExcelInput(){
 }
 
 void SerialCommands(){
+  static char inByte='\0';
   while(Serial.available()){
-    char inByte=Serial.read();
+    inByte=Serial.read();
     switch(inByte){
       case 'J':
         delay(10);
         inByte=Serial.read();
         delay(10);
-        sprintf(bufferSerial,"Before: %c",inByte);
+        sprintf(bufferSerial,"Before: %c/%d",inByte,inByte);
         Serial.println(bufferSerial);
-        if(inByte <= '0' && inByte>='9') return;
+        if((inByte<'0') || (inByte>'9')) return;
         sprintf(bufferSerial,"Excel: %d",inByte-'0');
         Serial.println(bufferSerial);
         measureState=static_cast<MeasureMode>(inByte-'0');
         sprintf(bufferSerial,"MeasureMode: %d",static_cast<int>(measureState));
         Serial.println(bufferSerial);
+        break;
 
       case 'o':
         measureState=MeasureMode::OFF;
@@ -148,7 +147,11 @@ void SerialCommands(){
         sprintf(bufferSerial,"BitNumber: %d\t Resolution: %lu",bitNumber,digitalResolution);
         Serial.println(bufferSerial);
         break;
-  
+
+      case 'z':
+        sprintf(bufferSerial,"MeasureMode: %d",static_cast<int>(measureState));
+        Serial.println(bufferSerial);
+        break;
       case 'm':
         measureState=MeasureMode::RAW;
         sprintf(bufferSerial,"MeasureMode: RAW");
