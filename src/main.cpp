@@ -8,8 +8,8 @@ enum class MeasureMode: uint8_t{
   OFF
 }measureState;
 
-constexpr uint16_t strainOffset=15;
-constexpr uint16_t currentOffset=15;
+constexpr uint16_t strainOffset=5;
+constexpr uint16_t currentOffset=2;
 typedef uint32_t excel;
 Pin strainPin=Pin(A0,"Strain",strainOffset);
 Pin currentPin=Pin(A5,"Current",currentOffset);
